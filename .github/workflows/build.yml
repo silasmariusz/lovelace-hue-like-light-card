@@ -1,0 +1,42 @@
+name: Build and upload artifact
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Force production mode for Rollup (patch rollup.config.mjs)
+        run: |
+          node -e "const fs=require('fs'); const p='rollup.config.mjs'; if(fs.existsSync(p)){ let s=fs.readFileSync(p,'utf8'); const n=s.replace(/var\s+dev\s*=\s*true\s*;/,'var dev = false;'); fs.writeFileSync(p,n); console.log('Patched',p); } else console.log(p+' not found');"
+
+      - name: Build (production)
+        run: npx rollup -c
+
+      - name: List output
+        run: ls -la ./release || ls -la ./dist || true
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            release/**
+            dist/**
